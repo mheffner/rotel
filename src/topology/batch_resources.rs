@@ -34,13 +34,11 @@ impl BatchSplittable for ResourceSpans {
                 count_moved += span_len;
             } else {
                 // We'll need to harvest a subset of the spans
-                let mut spans = vec![];
-                while !self.scope_spans[0].spans.is_empty() && count_moved < split_n {
-                    // Remove the span and add to the new ss
-                    let s = self.scope_spans[0].spans.remove(0);
-                    spans.push(s);
-                    count_moved += 1
-                }
+                // Move the first (split_n - count_moved) items in one shot, removing them one at
+                // a time from the front is quadratic in the number of items.
+                let n = split_n - count_moved;
+                let spans: Vec<_> = self.scope_spans[0].spans.drain(..n).collect();
+                count_moved += n;
                 // Now we need to clone data from this ScopeSpan for our new ScopeSpans
                 let ss = ScopeSpans {
                     scope: self.scope_spans[0].scope.clone(),
@@ -99,13 +97,11 @@ impl BatchSplittable for ResourceMetrics {
                 count_moved += metric_len;
             } else {
                 // We'll need to harvest a subset of the spans
-                let mut metrics = vec![];
-                while !self.scope_metrics[0].metrics.is_empty() && count_moved < split_n {
-                    // Remove the span and add to the new ss
-                    let s = self.scope_metrics[0].metrics.remove(0);
-                    metrics.push(s);
-                    count_moved += 1
-                }
+                // Move the first (split_n - count_moved) items in one shot, removing them one at
+                // a time from the front is quadratic in the number of items.
+                let n = split_n - count_moved;
+                let metrics: Vec<_> = self.scope_metrics[0].metrics.drain(..n).collect();
+                count_moved += n;
                 // Now we need to clone data from this ScopeSpan for our new ScopeSpans
                 let sm = ScopeMetrics {
                     scope: self.scope_metrics[0].scope.clone(),
@@ -151,13 +147,11 @@ impl BatchSplittable for ResourceLogs {
                 count_moved += span_len;
             } else {
                 // We'll need to harvest a subset of the spans
-                let mut log_records = vec![];
-                while !self.scope_logs[0].log_records.is_empty() && count_moved < split_n {
-                    // Remove the span and add to the new ss
-                    let s = self.scope_logs[0].log_records.remove(0);
-                    log_records.push(s);
-                    count_moved += 1
-                }
+                // Move the first (split_n - count_moved) items in one shot, removing them one at
+                // a time from the front is quadratic in the number of items.
+                let n = split_n - count_moved;
+                let log_records: Vec<_> = self.scope_logs[0].log_records.drain(..n).collect();
+                count_moved += n;
                 // Now we need to clone data from this ScopeSpan for our new ScopeSpans
                 let sl = ScopeLogs {
                     scope: self.scope_logs[0].scope.clone(),
