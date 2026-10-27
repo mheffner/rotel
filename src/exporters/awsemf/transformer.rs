@@ -615,7 +615,12 @@ impl MetricTransformer {
             }
         }
 
-        Ok(Event::new(timestamp_ms, emf_log.to_string()))
+        // serde_json::to_string writes straight into a Vec, unlike Value's Display impl
+        let message = serde_json::to_string(&emf_log).map_err(|e| ExportError::ExportFailed {
+            message: format!("failed to serialize EMF log: {}", e),
+        })?;
+
+        Ok(Event::new(timestamp_ms, message))
     }
 
     fn extract_dimensions_from_number_data_point(

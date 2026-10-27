@@ -8,12 +8,22 @@ use flate2::bufread::GzEncoder;
 use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
 use http::{HeaderMap, HeaderValue, Method, Request, Uri};
 use http_body_util::Full;
-use serde_json::json;
+use serde::Serialize;
 use std::error::Error;
 use std::io::Read;
 use tower::BoxError;
 
-use super::event::{Event, EventBatch};
+use super::event::{Event, EventBatch, LogEvents};
+
+// PutLogEvents request body, serialized directly (fields in the sorted order a serde_json object
+// would use)
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PutLogEvents<'a> {
+    log_events: LogEvents<'a>,
+    log_group_name: &'a str,
+    log_stream_name: &'a str,
+}
 
 fn build_url(endpoint: &url::Url, path: &str) -> url::Url {
     endpoint.join(path).unwrap()
@@ -91,14 +101,11 @@ impl AwsEmfRequestBuilder {
         let total_batches = batches.len();
 
         for (idx, batch) in batches.into_iter().enumerate() {
-            let data = json!({
-                "logGroupName": self.log_group_name,
-                "logStreamName": self.log_stream_name,
-                "logEvents": batch.get_events(),
-            })
-            .to_string();
-
-            let data = Bytes::from(data.into_bytes());
+            let data = serde_json::to_vec(&PutLogEvents {
+                log_events: batch.log_events(),
+                log_group_name: &self.log_group_name,
+                log_stream_name: &self.log_stream_name,
+            })?;
 
             let mut gz_vec = Vec::new();
             let mut gz = GzEncoder::new(&data[..], Compression::default());
@@ -146,5 +153,59 @@ impl AwsEmfRequestBuilder {
         }
 
         Ok(reqs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::read::GzDecoder;
+    use http_body_util::BodyExt;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn body_matches_value_serialization() {
+        let builder = AwsEmfRequestBuilder::new(
+            "http://localhost:4566".to_string(),
+            "group".to_string(),
+            "stream \"s\"".to_string(),
+        )
+        .unwrap();
+        let reqs = builder
+            .build(
+                vec![
+                    Event::new(2000, "{\"b\":2}".to_string()),
+                    Event::new(1000, "{\"a\":1}".to_string()),
+                ],
+                None,
+            )
+            .unwrap();
+        assert_eq!(reqs.len(), 1);
+
+        let body = reqs
+            .into_iter()
+            .next()
+            .unwrap()
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        let mut decoded = String::new();
+        GzDecoder::new(&body[..])
+            .read_to_string(&mut decoded)
+            .unwrap();
+
+        // What the request body was built from before: a serde_json::Value, events sorted by time
+        let expected = json!({
+            "logGroupName": "group",
+            "logStreamName": "stream \"s\"",
+            "logEvents": [
+                {"timestamp": 1000, "message": "{\"a\":1}"},
+                {"timestamp": 2000, "message": "{\"b\":2}"},
+            ],
+        })
+        .to_string();
+        assert_eq!(decoded, expected);
     }
 }
