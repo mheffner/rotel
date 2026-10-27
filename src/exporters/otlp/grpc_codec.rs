@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::exporters::otlp::errors::ExporterError;
+use crate::otlp::encode::OtlpEncode;
 use crate::telemetry::{Counter, RotelCounter};
 use bytes::{BufMut, Bytes, BytesMut};
 use flate2::Compression as GZCompression;
-use flate2::read::GzEncoder;
-use flate2::write::GzDecoder;
+use flate2::write::{GzDecoder, GzEncoder};
 use opentelemetry::KeyValue;
-use std::io::{Read, Write};
+use std::io::Write;
 use tonic::Status;
 
 // one byte for the compression flag plus four bytes for the length
@@ -89,42 +89,37 @@ pub fn grpc_decode_body<T: prost::Message + Default>(
     }
 }
 
-// taken from <https://github.com/hyperium/tonic/blob/5aa8ae1fec27377cd4c2a41d309945d7e38087d0/examples/src/grpc-web/client.rs#L45-L75>
+/// Encode a message as a gRPC length-prefixed message, optionally gzip compressed
 pub fn grpc_encode_body<T>(msg: T, compress: bool) -> Result<Bytes, Box<dyn std::error::Error>>
 where
-    T: prost::Message,
+    T: OtlpEncode,
 {
-    let mut buf = BytesMut::with_capacity(1024);
+    let lens = msg.measure();
 
-    // first skip past the header
-    // cannot write it yet since we don't know the size of the
-    // encoded message
-    buf.reserve(GRPC_HEADER_SIZE);
-    unsafe {
-        buf.advance_mut(GRPC_HEADER_SIZE);
-    }
+    let mut buf = if compress {
+        // Encode into an exactly sized buffer, then compress straight into the gRPC frame
+        let mut uncompressed = Vec::with_capacity(lens.encoded_len());
+        msg.encode_measured(&lens, &mut uncompressed);
+        drop(msg);
 
-    if compress {
-        let mut uncompressed = BytesMut::with_capacity(1024);
-
-        msg.encode(&mut uncompressed).unwrap();
-
-        let mut gz = GzEncoder::new(&uncompressed[..], GZCompression::default());
-        let mut buffer = Vec::new();
-
-        // todo: Can we eliminate this extra buffer?
-        if let Err(e) = gz.read_to_end(&mut buffer) {
+        let mut buf = BytesMut::with_capacity(GRPC_HEADER_SIZE + uncompressed.len() / 4);
+        buf.put_bytes(0, GRPC_HEADER_SIZE);
+        let mut gz = GzEncoder::new(buf.writer(), GZCompression::default());
+        if let Err(e) = gz.write_all(&uncompressed) {
             return Err(format!("unable to gzip encode buffer: {}", e).into());
         }
-
-        buf.put(&buffer[..]);
+        match gz.finish() {
+            Ok(w) => w.into_inner(),
+            Err(e) => return Err(format!("unable to gzip encode buffer: {}", e).into()),
+        }
     } else {
-        // write the message
-        msg.encode(&mut buf).unwrap();
-    }
+        let mut buf = BytesMut::with_capacity(GRPC_HEADER_SIZE + lens.encoded_len());
+        buf.put_bytes(0, GRPC_HEADER_SIZE);
+        msg.encode_measured(&lens, &mut buf);
+        buf
+    };
 
-    // now we know the size of encoded message and can write the
-    // header
+    // now we know the size of encoded message and can write the header
     let len = buf.len() - GRPC_HEADER_SIZE;
     {
         let mut buf = &mut buf[..GRPC_HEADER_SIZE];
@@ -135,5 +130,5 @@ where
         buf.put_u32(len as u32);
     }
 
-    Ok(buf.split_to(len + GRPC_HEADER_SIZE).freeze())
+    Ok(buf.freeze())
 }

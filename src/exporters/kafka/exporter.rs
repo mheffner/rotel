@@ -4,6 +4,7 @@ use crate::bounded_channel::BoundedReceiver;
 use crate::exporters::kafka::config::KafkaExporterConfig;
 use crate::exporters::kafka::errors::{KafkaExportError, Result};
 use crate::exporters::kafka::request_builder::KafkaRequestBuilder;
+use crate::otlp::encode::OtlpEncode;
 use crate::topology::payload::{Ack, Message, MessageMetadata, OTLPFrom};
 use bytes::Bytes;
 use futures::stream::FuturesUnordered;
@@ -98,7 +99,7 @@ pub trait KafkaExportable:
     Debug + Send + Sized + 'static + prost::Message + Serialize + Clone
 {
     /// The OTLP request type for this telemetry type
-    type Request: prost::Message + OTLPFrom<Vec<Message<Self>>> + Serialize + Clone;
+    type Request: prost::Message + OtlpEncode + OTLPFrom<Vec<Message<Self>>> + Serialize + Clone;
 
     /// Create a new request builder for this telemetry type
     fn create_request_builder(

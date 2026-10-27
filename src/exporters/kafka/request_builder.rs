@@ -2,6 +2,7 @@
 
 use crate::exporters::kafka::config::SerializationFormat;
 use crate::exporters::kafka::errors::Result;
+use crate::otlp::encode::OtlpEncode;
 use crate::topology::payload::OTLPFrom;
 use bytes::Bytes;
 use opentelemetry_proto::tonic::logs::v1::{LogsData, ResourceLogs};
@@ -53,7 +54,7 @@ pub struct KafkaRequestBuilder<Resource, Request> {
 impl<Resource, Request> KafkaRequestBuilder<Resource, Request>
 where
     Resource: Message + Serialize + Clone + ToDataWrapper,
-    Request: Message + OTLPFrom<Vec<Resource>> + Serialize,
+    Request: Message + OtlpEncode + OTLPFrom<Vec<Resource>> + Serialize,
 {
     /// Create a new request builder
     pub fn new(format: SerializationFormat) -> Self {
@@ -85,9 +86,7 @@ where
         // Create OTLP service request using OTLPFrom trait
         let request = Request::otlp_from(resources);
 
-        let mut buf = Vec::new();
-        request.encode(&mut buf)?;
-        Ok(Bytes::from(buf))
+        Ok(Bytes::from(request.encode_to_vec_measured()))
     }
 }
 

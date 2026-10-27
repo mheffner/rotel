@@ -16,6 +16,7 @@ use crate::exporters::otlp::grpc_codec::grpc_encode_body;
 use crate::exporters::otlp::http_codec::http_encode_body;
 use crate::exporters::otlp::payload::OtlpPayload;
 use crate::exporters::otlp::{CompressionEncoding, Endpoint, Protocol};
+use crate::otlp::encode::OtlpEncode;
 use crate::telemetry::{Counter, RotelCounter};
 use crate::topology::payload::MessageMetadata;
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -238,7 +239,10 @@ impl<T: prost::Message> RequestBuilder<T> {
         message: T,
         size: usize,
         metadata: Option<Vec<MessageMetadata>>,
-    ) -> Result<Request<OtlpPayload>, ExporterError> {
+    ) -> Result<Request<OtlpPayload>, ExporterError>
+    where
+        T: OtlpEncode,
+    {
         let res = self.new_request(message);
         match res {
             Ok(request) => {
@@ -271,7 +275,10 @@ impl<T: prost::Message> RequestBuilder<T> {
     ///
     /// # Returns
     /// * `Result<Request<Full<Bytes>>, Box<dyn Error>>`
-    fn new_request(&self, message: T) -> Result<Request<Full<Bytes>>, Box<dyn Error>> {
+    fn new_request(&self, message: T) -> Result<Request<Full<Bytes>>, Box<dyn Error>>
+    where
+        T: OtlpEncode,
+    {
         let body = match self.config.protocol {
             Protocol::Grpc => grpc_encode_body(message, self.config.compression.is_some()),
             Protocol::Http => http_encode_body(message, self.config.compression.is_some()),

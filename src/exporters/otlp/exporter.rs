@@ -22,6 +22,7 @@ use crate::exporters::otlp::request::RequestBuilder;
 use crate::exporters::otlp::signer::get_signing_service_builder;
 use crate::exporters::otlp::{Authenticator, errors, get_meter, request};
 use crate::exporters::shared::aws_signing_service::AwsSigningServiceBuilder;
+use crate::otlp::encode::OtlpEncode;
 use crate::telemetry::RotelCounter;
 use crate::topology::batch::BatchSizer;
 use crate::topology::flush_control::{FlushReceiver, FlushRequest, conditional_flush};
@@ -369,7 +370,7 @@ impl<Resource, Request, Response> Exporter<Resource, Request, Response>
 where
     Response: prost::Message + std::fmt::Debug + Clone + Default + Send + 'static,
     Resource: prost::Message + std::fmt::Debug + Clone + Send + 'static,
-    Request: prost::Message + OTLPFrom<Vec<Resource>> + Clone + 'static,
+    Request: prost::Message + OtlpEncode + OTLPFrom<Vec<Resource>> + Clone + 'static,
     [Resource]: BatchSizer,
 {
     /// Creates a new Exporter instance

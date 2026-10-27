@@ -1373,7 +1373,10 @@ fn start_otlp_exporter<Resource, Request, Response>(
     exporter: otlp::exporter::Exporter<Resource, Request, Response>,
     cancel_token: CancellationToken,
 ) where
-    Request: prost::Message + topology::payload::OTLPFrom<Vec<Resource>> + Clone,
+    Request: prost::Message
+        + crate::otlp::encode::OtlpEncode
+        + topology::payload::OTLPFrom<Vec<Resource>>
+        + Clone,
     Resource: prost::Message + std::fmt::Debug + Clone,
     [Resource]: BatchSizer,
     Response: prost::Message + std::fmt::Debug + Default + Clone,

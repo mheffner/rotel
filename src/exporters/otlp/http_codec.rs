@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::exporters::otlp::errors::ExporterError;
+use crate::otlp::encode::OtlpEncode;
 use crate::telemetry::{Counter, RotelCounter};
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use flate2::Compression as GZCompression;
-use flate2::read::GzEncoder;
-use flate2::write::GzDecoder;
+use flate2::write::{GzDecoder, GzEncoder};
 use opentelemetry::KeyValue;
-use std::io::{Read, Write};
+use std::io::Write;
 
 pub fn http_decode_body<T: prost::Message + Default>(
     body: Bytes,
@@ -61,22 +61,24 @@ pub fn http_decode_body<T: prost::Message + Default>(
 
 pub fn http_encode_body<T>(msg: T, compress: bool) -> Result<Bytes, Box<dyn std::error::Error>>
 where
-    T: prost::Message,
+    T: OtlpEncode,
 {
-    let mut uncompressed = BytesMut::with_capacity(1024);
-
-    msg.encode(&mut uncompressed).unwrap();
+    let uncompressed = msg.encode_to_vec_measured();
+    drop(msg);
 
     if !compress {
-        return Ok(uncompressed.freeze());
+        return Ok(Bytes::from(uncompressed));
     }
 
-    let mut gz = GzEncoder::new(&uncompressed[..], GZCompression::default());
-    let mut buffer = Vec::new();
-
-    if let Err(e) = gz.read_to_end(&mut buffer) {
+    let mut gz = GzEncoder::new(
+        BytesMut::with_capacity(uncompressed.len() / 4).writer(),
+        GZCompression::default(),
+    );
+    if let Err(e) = gz.write_all(&uncompressed) {
         return Err(format!("unable to gzip encode buffer: {}", e).into());
     }
-
-    Ok(Bytes::from(buffer))
+    match gz.finish() {
+        Ok(w) => Ok(w.into_inner().freeze()),
+        Err(e) => Err(format!("unable to gzip encode buffer: {}", e).into()),
+    }
 }
