@@ -399,7 +399,7 @@ pub fn get_metrics_summary_row_col_keys() -> String {
 
 #[derive(Debug)]
 pub enum MapOrJson<'a> {
-    Map(Vec<(String, String)>),
+    Map(Vec<(Cow<'a, str>, Cow<'a, str>)>),
     Json(HashMap<Cow<'a, str>, JsonType<'a>>),
     JsonOwned(HashMap<String, JsonType<'static>>),
 }
