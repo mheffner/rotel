@@ -100,6 +100,12 @@ pub struct OTLPReceiverArgs {
     /// Example: "my-custom-header,another-header"
     #[arg(long, env = "ROTEL_OTLP_GRPC_HEADERS_TO_INCLUDE", default_value = "")]
     pub otlp_grpc_headers_to_include: String,
+
+    /// Disable Nagle's algorithm (set TCP_NODELAY) on connections accepted by the OTLP gRPC and
+    /// HTTP receivers. This avoids small responses being held back by the client's delayed ACK,
+    /// lowering request latency, at the cost of potentially more (smaller) TCP segments.
+    #[arg(long, env = "ROTEL_OTLP_RECEIVER_TCP_NODELAY", default_value = "false")]
+    pub otlp_receiver_tcp_nodelay: bool,
 }
 
 impl Default for OTLPReceiverArgs {
@@ -118,6 +124,7 @@ impl Default for OTLPReceiverArgs {
             otlp_http_headers_to_include: String::new(),
             otlp_grpc_include_metadata: false,
             otlp_grpc_headers_to_include: String::new(),
+            otlp_receiver_tcp_nodelay: false,
         }
     }
 }
@@ -148,6 +155,7 @@ impl From<&OTLPReceiverArgs> for OTLPReceiverConfig {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect(),
+            otlp_receiver_tcp_nodelay: value.otlp_receiver_tcp_nodelay,
         }
     }
 }

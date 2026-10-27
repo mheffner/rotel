@@ -172,8 +172,17 @@ Any option above that does not contain a default is considered false or unset by
 | --otlp-receiver-logs-http-path    | /v1/logs             |                                                                    |
 | --otel-resource-attributes        |                      |                                                                    |
 | --enable-internal-telemetry       |                      |                                                                    |
+| --otlp-receiver-tcp-nodelay       |                      |                                                                    |
+| --exporter-tcp-nodelay            |                      |                                                                    |
 
 The PID and LOG files are only used when run in `--daemon` mode.
+
+`--otlp-receiver-tcp-nodelay` disables Nagle's algorithm (sets `TCP_NODELAY`) on connections accepted by the OTLP
+gRPC and HTTP receivers, and `--exporter-tcp-nodelay` does the same for the outbound connections of the HTTP/gRPC
+based exporters (OTLP, Datadog, Clickhouse, AWS X-Ray, AWS EMF). Both are off by default. With Nagle enabled, small
+response frames can wait for the peer's delayed ACK (about 40ms on Linux), which adds latency to OTLP export calls
+and can limit throughput for clients with few requests in flight. Enabling them can lower export latency
+significantly, at the cost of potentially sending more, smaller TCP segments.
 
 See the section for [Multiple Exporters](#multiple-exporters) for how to configure multiple exporters
 

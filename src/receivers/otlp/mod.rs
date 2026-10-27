@@ -18,4 +18,5 @@ pub struct OTLPReceiverConfig {
     pub otlp_http_headers_to_include: Vec<String>,
     pub otlp_grpc_include_metadata: bool,
     pub otlp_grpc_headers_to_include: Vec<String>,
+    pub otlp_receiver_tcp_nodelay: bool,
 }

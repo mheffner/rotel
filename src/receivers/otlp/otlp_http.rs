@@ -73,6 +73,7 @@ pub struct OTLPHttpServerBuilder {
     header_timeout: Option<Duration>,
     include_metadata: bool,
     headers_to_include: Vec<String>,
+    tcp_nodelay: bool,
 }
 
 impl OTLPHttpServerBuilder {
@@ -126,6 +127,12 @@ impl OTLPHttpServerBuilder {
         self
     }
 
+    /// Disable Nagle's algorithm (TCP_NODELAY) on accepted connections
+    pub fn with_tcp_nodelay(mut self, tcp_nodelay: bool) -> Self {
+        self.tcp_nodelay = tcp_nodelay;
+        self
+    }
+
     pub fn build(self) -> OTLPHttpServer {
         OTLPHttpServer {
             trace_output: self.trace_output,
@@ -137,6 +144,7 @@ impl OTLPHttpServerBuilder {
             logs_path: self.logs_path,
             include_metadata: self.include_metadata,
             headers_to_include: self.headers_to_include,
+            tcp_nodelay: self.tcp_nodelay,
         }
     }
 }
@@ -151,6 +159,7 @@ pub struct OTLPHttpServer {
     header_timeout: Duration,
     include_metadata: bool,
     headers_to_include: Vec<String>,
+    tcp_nodelay: bool,
 }
 
 impl OTLPHttpServer {
@@ -200,6 +209,9 @@ impl OTLPHttpServer {
                 _ = cancellation.cancelled() => break
             };
 
+            if self.tcp_nodelay {
+                let _ = stream.set_nodelay(true);
+            }
             let io = TokioIo::new(stream);
 
             let conn = builder.serve_connection(io, svc.clone());

@@ -144,6 +144,9 @@ impl Agent {
         // Initialize the TLS library, we may want to do this conditionally
         init_crypto_provider()?;
 
+        // Must be set before any exporter client is built
+        crate::exporters::http::client::set_exporter_tcp_nodelay(config.exporter_tcp_nodelay);
+
         let num_cpus = num_cpus::get();
 
         let mut receivers_task_set = JoinSet::new();
@@ -946,6 +949,7 @@ impl Agent {
                         .with_logs_output(logs_output.clone())
                         .with_include_metadata(config.otlp_grpc_include_metadata)
                         .with_headers_to_include(config.otlp_grpc_headers_to_include.clone())
+                        .with_tcp_nodelay(config.otlp_receiver_tcp_nodelay)
                         .build();
 
                     let grpc_listener = self.port_map.remove(&config.otlp_grpc_endpoint).unwrap();
@@ -968,6 +972,7 @@ impl Agent {
                         .with_logs_path(config.otlp_receiver_logs_http_path.clone())
                         .with_include_metadata(config.otlp_http_include_metadata)
                         .with_headers_to_include(config.otlp_http_headers_to_include.clone())
+                        .with_tcp_nodelay(config.otlp_receiver_tcp_nodelay)
                         .build();
 
                     let http_listener = self.port_map.remove(&config.otlp_http_endpoint).unwrap();

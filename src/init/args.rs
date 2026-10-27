@@ -139,6 +139,11 @@ pub struct AgentRun {
     #[arg(long, env = "ROTEL_ENABLE_INTERNAL_TELEMETRY", default_value = "false")]
     pub enable_internal_telemetry: bool,
 
+    /// Disable Nagle's algorithm (set TCP_NODELAY) on outbound connections of all HTTP and gRPC
+    /// based exporters (OTLP, Datadog, Clickhouse, AWS X-Ray, AWS EMF).
+    #[arg(long, env = "ROTEL_EXPORTER_TCP_NODELAY", default_value = "false")]
+    pub exporter_tcp_nodelay: bool,
+
     #[command(flatten)]
     pub batch: BatchArgs,
 
@@ -226,6 +231,7 @@ impl Default for AgentRun {
             async_processor_preserve_on_panic: false,
             otel_resource_attributes: None,
             enable_internal_telemetry: false,
+            exporter_tcp_nodelay: false,
             batch: BatchArgs::default(),
             exporter: None,
             exporters: None,

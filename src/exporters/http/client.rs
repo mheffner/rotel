@@ -24,6 +24,7 @@ use std::fmt::{Display, Formatter};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tonic::Status;
@@ -33,6 +34,23 @@ use tracing::warn;
 // Default connection pool settings
 pub const DEFAULT_POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(30);
 pub const DEFAULT_POOL_MAX_IDLE_PER_HOST: usize = 100;
+
+// Whether exporter connections disable Nagle's algorithm (TCP_NODELAY). This is process wide
+// (--exporter-tcp-nodelay) and is set once at startup, before any exporter client is built.
+static EXPORTER_TCP_NODELAY: AtomicBool = AtomicBool::new(false);
+
+/// Set whether HTTP/gRPC exporter clients built after this call use TCP_NODELAY.
+pub fn set_exporter_tcp_nodelay(enabled: bool) {
+    EXPORTER_TCP_NODELAY.store(enabled, Ordering::Relaxed);
+}
+
+// Same connector HttpsConnectorBuilder::build() creates, with an optional TCP_NODELAY.
+fn build_http_connector(nodelay: bool) -> HttpConnector {
+    let mut http = HttpConnector::new();
+    http.enforce_http(false);
+    http.set_nodelay(nodelay);
+    http
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Protocol {
@@ -95,7 +113,9 @@ where
         .with_tls_config(client_config)
         .https_or_http()
         .enable_http2()
-        .build();
+        .wrap_connector(build_http_connector(
+            EXPORTER_TCP_NODELAY.load(Ordering::Relaxed),
+        ));
 
     let client = hyper_util::client::legacy::Client::builder(TokioExecutor::new())
         .pool_idle_timeout(pool_idle_timeout)
@@ -300,4 +320,34 @@ pub async fn response_bytes(body: Incoming) -> Result<Bytes, BoxError> {
         .await
         .map(|col| col.to_bytes())
         .map_err(|e| format!("failed to read response body: {}", e).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    async fn connected_nodelay(nodelay: bool) -> bool {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let uri: http::Uri = format!("http://{}", listener.local_addr().unwrap())
+            .parse()
+            .unwrap();
+
+        let mut connector = build_http_connector(nodelay);
+        std::future::poll_fn(|cx| connector.poll_ready(cx))
+            .await
+            .unwrap();
+        let conn = connector.call(uri).await.unwrap();
+        conn.inner().nodelay().unwrap()
+    }
+
+    #[tokio::test]
+    async fn connector_with_nodelay_sets_tcp_nodelay() {
+        assert!(connected_nodelay(true).await);
+    }
+
+    #[tokio::test]
+    async fn connector_without_nodelay_keeps_default() {
+        assert!(!connected_nodelay(false).await);
+    }
 }

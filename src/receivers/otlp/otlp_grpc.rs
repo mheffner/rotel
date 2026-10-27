@@ -42,6 +42,7 @@ pub struct OTLPGrpcServerBuilder {
     logs_output: Option<OTLPOutput<Message<ResourceLogs>>>,
     include_metadata: bool,
     headers_to_include: Vec<String>,
+    tcp_nodelay: bool,
 }
 
 impl OTLPGrpcServerBuilder {}
@@ -83,6 +84,12 @@ impl OTLPGrpcServerBuilder {
         self
     }
 
+    /// Disable Nagle's algorithm (TCP_NODELAY) on accepted connections
+    pub fn with_tcp_nodelay(mut self, tcp_nodelay: bool) -> Self {
+        self.tcp_nodelay = tcp_nodelay;
+        self
+    }
+
     pub fn build(self) -> OTLPGrpcServer {
         OTLPGrpcServer {
             traces_output: self.traces_output,
@@ -91,6 +98,7 @@ impl OTLPGrpcServerBuilder {
             max_recv_msg_size_mib: self.max_recv_msg_size_mib,
             include_metadata: self.include_metadata,
             headers_to_include: self.headers_to_include,
+            tcp_nodelay: self.tcp_nodelay,
         }
     }
 }
@@ -102,6 +110,7 @@ pub struct OTLPGrpcServer {
     max_recv_msg_size_mib: Option<usize>,
     include_metadata: bool,
     headers_to_include: Vec<String>,
+    tcp_nodelay: bool,
 }
 
 impl OTLPGrpcServer {
@@ -121,7 +130,7 @@ impl OTLPGrpcServer {
             self.include_metadata,
             self.headers_to_include.clone(),
         );
-        let stream = listener.into_stream()?;
+        let stream = listener.into_stream_with_nodelay(self.tcp_nodelay)?;
 
         let mut builder = Server::builder();
         let mut router: Option<Router> = None;
