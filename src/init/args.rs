@@ -139,6 +139,17 @@ pub struct AgentRun {
     #[arg(long, env = "ROTEL_ENABLE_INTERNAL_TELEMETRY", default_value = "false")]
     pub enable_internal_telemetry: bool,
 
+    /// Maximum number of batches queued between the pipeline and each exporter. When the queue is
+    /// full the pipeline stops accepting new data until the exporter catches up.
+    #[arg(long, env = "ROTEL_EXPORTER_SENDING_QUEUE_SIZE", default_value = "1000", value_parser = clap::value_parser!(u64).range(1..))]
+    pub exporter_sending_queue_size: u64,
+
+    /// Maximum number of telemetry items (spans, metric data points or log records) queued between
+    /// the pipeline and each exporter, in addition to --exporter-sending-queue-size. Bounds the
+    /// memory used by a backed-up exporter. Unlimited by default.
+    #[arg(long, env = "ROTEL_EXPORTER_SENDING_QUEUE_MAX_ITEMS", value_parser = clap::value_parser!(u64).range(1..))]
+    pub exporter_sending_queue_max_items: Option<u64>,
+
     #[command(flatten)]
     pub batch: BatchArgs,
 
@@ -226,6 +237,8 @@ impl Default for AgentRun {
             async_processor_preserve_on_panic: false,
             otel_resource_attributes: None,
             enable_internal_telemetry: false,
+            exporter_sending_queue_size: 1000,
+            exporter_sending_queue_max_items: None,
             batch: BatchArgs::default(),
             exporter: None,
             exporters: None,

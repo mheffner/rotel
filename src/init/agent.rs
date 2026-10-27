@@ -1,5 +1,5 @@
 use crate::aws_api::creds::AwsCredsProvider;
-use crate::bounded_channel::{BoundedReceiver, bounded};
+use crate::bounded_channel::{BoundedReceiver, bounded, bounded_with_weight_limit};
 use crate::crypto::init_crypto_provider;
 use crate::exporters::blackhole::BlackholeExporter;
 use crate::exporters::datadog::Region;
@@ -145,6 +145,7 @@ impl Agent {
         init_crypto_provider()?;
 
         let num_cpus = num_cpus::get();
+        let sending_queue_max_items = config.exporter_sending_queue_max_items.map(|n| n as usize);
 
         let mut receivers_task_set = JoinSet::new();
         let mut pipeline_task_set = JoinSet::new();
@@ -404,7 +405,11 @@ impl Agent {
         if activation.traces == TelemetryState::Active {
             for cfg in exp_config.traces {
                 let (trace_pipeline_out_tx, trace_pipeline_out_rx) =
-                    bounded::<Vec<Message<ResourceSpans>>>(self.sending_queue_size);
+                    bounded_with_weight_limit::<Vec<Message<ResourceSpans>>>(
+                        self.sending_queue_size,
+                        sending_queue_max_items,
+                        batch_item_count,
+                    );
                 trace_fanout = trace_fanout.add_tx(cfg.name(), trace_pipeline_out_tx);
 
                 match cfg {
@@ -560,7 +565,11 @@ impl Agent {
                 }
 
                 let (metrics_pipeline_out_tx, metrics_pipeline_out_rx) =
-                    bounded::<Vec<Message<ResourceMetrics>>>(self.sending_queue_size);
+                    bounded_with_weight_limit::<Vec<Message<ResourceMetrics>>>(
+                        self.sending_queue_size,
+                        sending_queue_max_items,
+                        batch_item_count,
+                    );
 
                 if is_internal_metrics {
                     internal_metrics_fanout =
@@ -699,7 +708,11 @@ impl Agent {
         if activation.logs == TelemetryState::Active {
             for cfg in exp_config.logs {
                 let (logs_pipeline_out_tx, logs_pipeline_out_rx) =
-                    bounded::<Vec<Message<ResourceLogs>>>(self.sending_queue_size);
+                    bounded_with_weight_limit::<Vec<Message<ResourceLogs>>>(
+                        self.sending_queue_size,
+                        sending_queue_max_items,
+                        batch_item_count,
+                    );
                 logs_fanout = logs_fanout.add_tx(cfg.name(), logs_pipeline_out_tx);
 
                 match cfg {
@@ -1404,4 +1417,10 @@ impl From<DatadogRegion> for Region {
             DatadogRegion::AP1 => Region::AP1,
         }
     }
+}
+
+/// Weight of a batch in the exporters' sending queue: the number of telemetry items it holds
+#[allow(clippy::ptr_arg)] // must match the channel's item type, Vec<Message<T>>
+fn batch_item_count<T: BatchSizer>(batch: &Vec<Message<T>>) -> usize {
+    batch.as_slice().size_of()
 }

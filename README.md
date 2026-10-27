@@ -172,8 +172,18 @@ Any option above that does not contain a default is considered false or unset by
 | --otlp-receiver-logs-http-path    | /v1/logs             |                                                                    |
 | --otel-resource-attributes        |                      |                                                                    |
 | --enable-internal-telemetry       |                      |                                                                    |
+| --exporter-sending-queue-size     | 1000                 |                                                                    |
+| --exporter-sending-queue-max-items |                     |                                                                    |
 
 The PID and LOG files are only used when run in `--daemon` mode.
+
+Batches leave the pipeline through a sending queue per exporter. `--exporter-sending-queue-size` is the maximum
+number of batches in that queue and `--exporter-sending-queue-max-items` optionally also limits the total number of
+telemetry items in it (spans, metric data points or log records; a batch bigger than the limit is admitted on its
+own). When an exporter falls behind, a full queue stops the pipeline from accepting more data, which pushes back on
+the receivers. With the defaults (1000 batches of up to `--batch-max-size` items, no item limit) a backed-up exporter
+can hold millions of items, and several GB of memory, in its queue. Lowering either option bounds that memory, at the
+cost of less buffering for bursts or short exporter outages.
 
 See the section for [Multiple Exporters](#multiple-exporters) for how to configure multiple exporters
 

@@ -15,6 +15,7 @@ mod transformer;
 
 use super::http::finalizer::ResultFinalizer;
 use crate::bounded_channel::BoundedReceiver;
+use crate::bounded_channel::RecvStream;
 use crate::exporters::clickhouse::api_request::ConnectionConfig;
 use crate::exporters::clickhouse::exception::extract_exception;
 use crate::exporters::clickhouse::request_builder::{RequestBuilder, TransformPayload};
@@ -33,7 +34,6 @@ use crate::exporters::http::types::ContentEncoding;
 use crate::topology::flush_control::FlushReceiver;
 use crate::topology::payload::Message;
 use bytes::Bytes;
-use flume::r#async::RecvStream;
 use http::Request;
 use opentelemetry_proto::tonic::logs::v1::ResourceLogs;
 use opentelemetry_proto::tonic::metrics::v1::ResourceMetrics;

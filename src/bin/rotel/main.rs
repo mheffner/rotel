@@ -34,8 +34,6 @@ use rotel::init::wait;
 // Used when daemonized
 static WORKDING_DIR: &str = "/"; // TODO
 
-const SENDING_QUEUE_SIZE: usize = 1_000;
-
 const FLUSH_PIPELINE_TIMEOUT_MILLIS: u64 = 500;
 const FLUSH_EXPORTERS_TIMEOUT_MILLIS: u64 = 3_000;
 
@@ -173,7 +171,8 @@ async fn run_agent(
         let token = cancel_token.clone();
         let env = env.clone();
         let agent_fut = async move {
-            let agent = Agent::new(agent_args, port_map, SENDING_QUEUE_SIZE, env)
+            let sending_queue_size = agent_args.exporter_sending_queue_size as usize;
+            let agent = Agent::new(agent_args, port_map, sending_queue_size, env)
                 .with_pipeline_flush(flush_pipeline_sub)
                 .with_exporters_flush(flush_exporters_sub);
             agent.run(token).await

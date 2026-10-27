@@ -4,7 +4,7 @@ use futures::FutureExt;
 use opentelemetry::metrics::ObservableGauge;
 use opentelemetry::{KeyValue, global};
 
-use crate::bounded_channel::BoundedSender;
+use crate::bounded_channel::{BoundedSender, SendError};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -25,11 +25,14 @@ pub struct FanoutBuilder<T> {
     consumers: Vec<(&'static str, BoundedSender<T>)>,
 }
 
+// Boxed `BoundedSender::send`, which also waits for room under the sending queue's item limit
+type SendFuture<'a> = Pin<Box<dyn Future<Output = Result<(), SendError>> + Send + 'a>>;
+
 pub struct FanoutFuture<'a, T> {
     consumers: &'a [BoundedSender<T>],
     message: Option<T>,
     current_index: usize,
-    current_send: Option<flume::r#async::SendFut<'a, T>>,
+    current_send: Option<SendFuture<'a>>,
 }
 
 // FanoutFuture is Unpin because all its fields are Unpin
@@ -107,7 +110,7 @@ impl<'a, T> FanoutFuture<'a, T> {
 
 impl<'a, T> Future for FanoutFuture<'a, T>
 where
-    T: Clone,
+    T: Clone + Send,
 {
     type Output = Result<(), FanoutError>;
 
@@ -152,8 +155,8 @@ where
                         .clone()
                 };
 
-                let send_fut = this.consumers[this.current_index].send_async(message_to_send);
-                this.current_send = Some(send_fut);
+                let send_fut = this.consumers[this.current_index].send(message_to_send);
+                this.current_send = Some(Box::pin(send_fut));
             }
         }
     }

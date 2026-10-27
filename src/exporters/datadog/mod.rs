@@ -5,6 +5,7 @@ use crate::exporters::datadog::request_builder::RequestBuilder;
 use crate::exporters::datadog::transform::Transformer;
 use crate::exporters::http::retry::{RetryConfig, RetryPolicy};
 
+use crate::bounded_channel::RecvStream;
 use crate::exporters::http::client::ResponseDecode;
 use crate::exporters::http::client::{Client, Protocol};
 use crate::exporters::http::exporter::Exporter;
@@ -15,7 +16,6 @@ use crate::exporters::http::types::ContentEncoding;
 use crate::topology::flush_control::FlushReceiver;
 use crate::topology::payload::Message;
 use bytes::Bytes;
-use flume::r#async::RecvStream;
 use http::Request;
 use opentelemetry_proto::tonic::trace::v1::ResourceSpans;
 use std::time::Duration;

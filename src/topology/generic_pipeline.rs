@@ -338,7 +338,7 @@ pub async fn conditional_wait<T>(
     send_fut: &mut Option<crate::topology::fanout::FanoutFuture<'_, Vec<Message<T>>>>,
 ) -> Option<Result<(), crate::topology::fanout::FanoutError>>
 where
-    T: Clone,
+    T: Clone + Send,
 {
     match send_fut {
         None => None,

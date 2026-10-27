@@ -15,10 +15,10 @@ use crate::exporters::http::tls;
 use crate::exporters::shared::aws_signing_service::{AwsSigningService, AwsSigningServiceBuilder};
 use crate::topology::flush_control::FlushReceiver;
 
+use crate::bounded_channel::RecvStream;
 use bytes::Bytes;
 use dim_filter::DimensionFilter;
 use errors::{AwsEmfDecoder, AwsEmfResponse, is_retryable_error};
-use flume::r#async::RecvStream;
 use http::Request;
 use opentelemetry_proto::tonic::metrics::v1::ResourceMetrics;
 use std::sync::Arc;
