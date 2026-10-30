@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a title="Releases" target="_blank" href="https://github.com/streamfold/rotel/releases"><img src="https://img.shields.io/github/release/streamfold/rotel?style=flat-square&color=9CF"></a>
+  <a title="Releases" target="_blank" href="https://github.com/rotel-dev/rotel/releases"><img src="https://img.shields.io/github/release/rotel-dev/rotel?style=flat-square&color=9CF"></a>
  </p>
 
 <p align="center">
@@ -38,14 +38,14 @@ and a compact binary size, simplifying deployment without the need for a sidecar
 
 **Runtime integrations:**
 
-- **Python:** [streamfold/pyrotel](https://github.com/streamfold/pyrotel)
-- **Node.js:** [streamfold/rotel-nodejs](https://github.com/streamfold/rotel-nodejs)
+- **Python:** [streamfold/pyrotel](https://github.com/rotel-dev/pyrotel)
+- **Node.js:** [streamfold/rotel-nodejs](https://github.com/rotel-dev/rotel-nodejs)
 
 Rotel provides a unified data plane framework for high-performance OpenTelemetry processing. It can be used as a library and deployed in many different form factors:
 
-- [**Lambda Extension**](https://github.com/streamfold/rotel-lambda-extension): AWS Lambda Extension for OpenTelemetry collection with minimal coldstart latency
-- [**Lambda Forwarder**](https://github.com/streamfold/rotel-lambda-forwarder): Convert and forward CloudWatch and S3-stored stored logs to OpenTelemetry compatible backends
-- [**AWS Firelens**](https://github.com/streamfold/aws-firelens-rotel): AWS Firelens log router for easy Amazon ECS container logging
+- [**Lambda Extension**](https://github.com/rotel-dev/rotel-lambda-extension): AWS Lambda Extension for OpenTelemetry collection with minimal coldstart latency
+- [**Lambda Forwarder**](https://github.com/rotel-dev/rotel-lambda-forwarder): Convert and forward CloudWatch and S3-stored stored logs to OpenTelemetry compatible backends
+- [**AWS Firelens**](https://github.com/rotel-dev/aws-firelens-rotel): AWS Firelens log router for easy Amazon ECS container logging
 
 Rotel is fully open-sourced and licensed under the Apache 2.0 license.
 
@@ -58,7 +58,7 @@ docker run -ti -p 4317-4318:4317-4318 public.ecr.aws/rotel-dev/rotel --debug-log
 
 Rotel is now listening on localhost:4317 (gRPC) and localhost:4318 (HTTP).
 
-_We use the [prebuilt Docker image](#docker-images) for this example, but you can also download a binary from the [releases](https://github.com/streamfold/rotel/releases) page._
+_We use the [prebuilt Docker image](#docker-images) for this example, but you can also download a binary from the [releases](https://github.com/rotel-dev/rotel/releases) page._
 
 ### Verify
 
@@ -1446,7 +1446,7 @@ the [Python Processor SDK Documentation](rotel_python_processor_sdk/rotel_sdk/RE
 ## Benchmarks
 
 We have taken the OpenTelemetry Collector benchmark suite and adapted it to run against Rotel. You can find
-the testing framework at [rotel-otel-loadtests](https://github.com/streamfold/rotel-otel-loadtests) and the benchmark
+the testing framework at [rotel-otel-loadtests](https://github.com/rotel-dev/rotel-otel-loadtests) and the benchmark
 results
 [here](https://streamfold.github.io/rotel-otel-loadtests/benchmarks/). The benchmarks are
 run nightly comparing the latest OTEL version against the latest Rotel release.

@@ -1,6 +1,6 @@
 # Rotel Rust Processor SDK
 
-Build custom telemetry processors for [Rotel](https://github.com/streamfold/rotel) in Rust. Processors are compiled as dynamic libraries (`.dylib`/`.so`) and loaded at runtime, allowing you to transform traces, logs, and metrics with native performance.
+Build custom telemetry processors for [Rotel](https://github.com/rotel-dev/rotel) in Rust. Processors are compiled as dynamic libraries (`.dylib`/`.so`) and loaded at runtime, allowing you to transform traces, logs, and metrics with native performance.
 
 ## Quick Start
 

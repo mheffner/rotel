@@ -5,12 +5,12 @@ Python type hints package for the Rotel processor SDK.
 ## Description
 
 This package provides type hints for the Rotel processor SDK and is intended for use with your Python LSP (pyright or
-other) in your IDE of choice. [Rotel](https://github.com/streamfold/rotel/) is an efficient, high-performance solution
+other) in your IDE of choice. [Rotel](https://github.com/rotel-dev/rotel/) is an efficient, high-performance solution
 for collecting, processing, and
 exporting telemetry data. Rotel is ideal for resource-constrained environments and applications where minimizing
 overhead is critical.
 
-When using a [Python processor enabled](https://github.com/streamfold/rotel/releases/) release of Rotel, you can write
+When using a [Python processor enabled](https://github.com/rotel-dev/rotel/releases/) release of Rotel, you can write
 native Python
 code to process and filter your telemetry data before sending to an exporter. Rotel
 provides Rust binding for Python with the [pyo3](https://crates.io/crates/pyo3) create to provide a high-performance
@@ -37,7 +37,7 @@ OpenTelemetry processor API bundled as a Python extension.
 ## Getting Started
 
 In order to use the Rotel Python processor SDK you will need to either build from source using the `--features pyo3`
-flag or download the latest [Python processor enabled version of Rotel](https://github.com/streamfold/rotel/releases/).
+flag or download the latest [Python processor enabled version of Rotel](https://github.com/rotel-dev/rotel/releases/).
 Python
 processor versions of Rotel are prefixed with `rotel_py_processor`. Choose the release that matches your system
 architecture and the version of Python you have installed .
