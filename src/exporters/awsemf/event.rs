@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde::{Serialize, Serializer};
 use tracing::warn;
 
 pub struct Event {
@@ -100,16 +100,27 @@ impl EventBatch {
         None
     }
 
-    pub(crate) fn get_events(self) -> Vec<Value> {
-        self.events
-            .into_iter()
-            .map(|event| {
-                json!({
-                    "timestamp": event.timestamp_ms,
-                    "message": event.message,
-                })
-            })
-            .collect()
+    /// Serializes as the `logEvents` array of a PutLogEvents request, borrowing the messages.
+    pub(crate) fn log_events(&self) -> LogEvents<'_> {
+        LogEvents(&self.events)
+    }
+}
+
+pub(crate) struct LogEvents<'a>(&'a [Event]);
+
+impl Serialize for LogEvents<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        // Same field order as a serde_json object (sorted keys)
+        #[derive(Serialize)]
+        struct LogEvent<'a> {
+            message: &'a str,
+            timestamp: i64,
+        }
+
+        serializer.collect_seq(self.0.iter().map(|e| LogEvent {
+            message: &e.message,
+            timestamp: e.timestamp_ms,
+        }))
     }
 }
 
@@ -262,28 +273,30 @@ mod tests {
     }
 
     #[test]
-    fn test_event_batch_get_events_with_data() {
+    fn test_event_batch_log_events_with_data() {
         let mut batch = EventBatch::new();
 
         let event1 = Event::new(1000, "message1".to_string());
-        let event2 = Event::new(2000, "message2".to_string());
+        let event2 = Event::new(2000, "message2 \"quoted\"".to_string());
 
         batch.add_event(event1);
         batch.add_event(event2);
 
-        let events = batch.get_events();
-        assert_eq!(events.len(), 2);
+        let expected = json!([
+            {
+                "timestamp": 1000,
+                "message": "message1"
+            },
+            {
+                "timestamp": 2000,
+                "message": "message2 \"quoted\""
+            }
+        ]);
 
-        let expected1 = json!({
-            "timestamp": 1000,
-            "message": "message1"
-        });
-        let expected2 = json!({
-            "timestamp": 2000,
-            "message": "message2"
-        });
-
-        assert_eq!(events[0], expected1);
-        assert_eq!(events[1], expected2);
+        // Same bytes as serializing the equivalent serde_json::Value
+        assert_eq!(
+            serde_json::to_string(&batch.log_events()).unwrap(),
+            expected.to_string()
+        );
     }
 }
