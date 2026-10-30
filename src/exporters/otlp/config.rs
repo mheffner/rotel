@@ -20,7 +20,7 @@ pub struct OTLPExporterConfig {
     pub(crate) protocol: Protocol,
     pub(crate) authenticator: Option<Authenticator>,
     pub(crate) headers: Vec<(String, String)>,
-    pub(crate) compression: Option<CompressionEncoding>,
+    pub(crate) compression: CompressionEncoding,
     pub(crate) retry_config: RetryConfig,
     pub(crate) request_timeout: Duration,
     pub(crate) encode_drain_max_time: Duration,
@@ -44,7 +44,7 @@ impl OTLPExporterConfig {
             authenticator: None,
             headers: vec![],
             tls_cfg_builder: Config::builder(),
-            compression: Some(CompressionEncoding::Gzip),
+            compression: CompressionEncoding::Gzip,
             retry_config,
             request_timeout: DEFAULT_REQUEST_TIMEOUT,
             encode_drain_max_time: Duration::from_secs(2),
@@ -108,7 +108,7 @@ impl OTLPExporterConfig {
         self
     }
 
-    pub fn with_compression_encoding(mut self, encoding: Option<CompressionEncoding>) -> Self {
+    pub fn with_compression_encoding(mut self, encoding: CompressionEncoding) -> Self {
         self.compression = encoding;
         self
     }

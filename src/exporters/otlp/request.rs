@@ -65,7 +65,7 @@ pub struct RequestBuilder<T> {
 pub struct RequestBuilderConfig {
     uri: String,
     pub protocol: Protocol,
-    compression: Option<CompressionEncoding>,
+    compression: CompressionEncoding,
     default_headers: HeaderMap,
 }
 
@@ -158,7 +158,7 @@ fn get_request_builder_config(
                 HeaderValue::from_static("gzip,identity"),
             );
             headermap.insert("Te", HeaderValue::from_static("trailers"));
-            if config.compression.is_some() {
+            if config.compression == CompressionEncoding::Gzip {
                 headermap.insert("grpc-encoding", HeaderValue::from_static("gzip"));
             }
         }
@@ -167,7 +167,7 @@ fn get_request_builder_config(
                 CONTENT_TYPE,
                 HeaderValue::from_static("application/x-protobuf"),
             );
-            if config.compression.is_some() {
+            if config.compression == CompressionEncoding::Gzip {
                 headermap.insert(CONTENT_ENCODING, HeaderValue::from_static("gzip"));
             }
         }
@@ -272,9 +272,10 @@ impl<T: prost::Message> RequestBuilder<T> {
     /// # Returns
     /// * `Result<Request<Full<Bytes>>, Box<dyn Error>>`
     fn new_request(&self, message: T) -> Result<Request<Full<Bytes>>, Box<dyn Error>> {
+        let compress = self.config.compression == CompressionEncoding::Gzip;
         let body = match self.config.protocol {
-            Protocol::Grpc => grpc_encode_body(message, self.config.compression.is_some()),
-            Protocol::Http => http_encode_body(message, self.config.compression.is_some()),
+            Protocol::Grpc => grpc_encode_body(message, compress),
+            Protocol::Http => http_encode_body(message, compress),
         }?;
 
         self.request_from_bytes(body)
@@ -470,5 +471,57 @@ mod test {
 
         // Verify the Authorization header is NOT present
         assert!(rbc.default_headers.get(AUTHORIZATION).is_none());
+    }
+
+    async fn encode_with_compression(
+        protocol: Protocol,
+        compression: CompressionEncoding,
+    ) -> (HeaderMap, Bytes, Vec<u8>) {
+        use crate::exporters::http::retry::RetryConfig;
+        use crate::exporters::otlp::config::OTLPExporterConfig;
+        use http_body_util::BodyExt;
+        use prost::Message;
+        use utilities::otlp::FakeOTLP;
+
+        let config = OTLPExporterConfig::new(
+            "test".to_string(),
+            Base("http://localhost:4317".to_string()),
+            protocol,
+            RetryConfig::default(),
+        )
+        .with_compression_encoding(compression);
+
+        let rb = build_traces(&config, RotelCounter::NoOpCounter).unwrap();
+        let msg = FakeOTLP::trace_service_request_with_spans(1, 10);
+        let raw = msg.encode_to_vec();
+        let (parts, body) = rb.new_request(msg).unwrap().into_parts();
+        let body = body.collect().await.unwrap().to_bytes();
+        (parts.headers, body, raw)
+    }
+
+    #[tokio::test]
+    async fn test_grpc_compression() {
+        let (headers, body, raw) = encode_with_compression(Grpc, CompressionEncoding::None).await;
+        assert!(headers.get("grpc-encoding").is_none());
+        assert_eq!(body[0], 0, "gRPC compressed flag should be unset");
+        assert_eq!(&body[5..], &raw[..]);
+
+        let (headers, body, raw) = encode_with_compression(Grpc, CompressionEncoding::Gzip).await;
+        assert_eq!(headers.get("grpc-encoding").unwrap(), "gzip");
+        assert_eq!(body[0], 1, "gRPC compressed flag should be set");
+        assert_eq!(&body[5..7], &[0x1f, 0x8b]);
+        assert_ne!(&body[5..], &raw[..]);
+    }
+
+    #[tokio::test]
+    async fn test_http_compression() {
+        let (headers, body, raw) = encode_with_compression(Http, CompressionEncoding::None).await;
+        assert!(headers.get(CONTENT_ENCODING).is_none());
+        assert_eq!(&body[..], &raw[..]);
+
+        let (headers, body, raw) = encode_with_compression(Http, CompressionEncoding::Gzip).await;
+        assert_eq!(headers.get(CONTENT_ENCODING).unwrap(), "gzip");
+        assert_eq!(&body[..2], &[0x1f, 0x8b]);
+        assert_ne!(&body[..], &raw[..]);
     }
 }
