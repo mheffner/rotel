@@ -4265,7 +4265,7 @@ dependencies = [
 
 [[package]]
 name = "rotel"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "abi_stable",
  "arrow",
