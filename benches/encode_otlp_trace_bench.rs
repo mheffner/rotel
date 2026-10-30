@@ -23,7 +23,7 @@ fn build_request_builder() -> RequestBuilder<ExportTraceServiceRequest> {
         Endpoint::Base("http://localhost:4317".to_string()),
         Protocol::Grpc,
     )
-    .with_compression_encoding(Some(CompressionEncoding::Gzip));
+    .with_compression_encoding(CompressionEncoding::Gzip);
     request::build_traces(&config, RotelCounter::NoOpCounter).unwrap()
 }
 

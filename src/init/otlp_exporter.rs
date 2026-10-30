@@ -683,7 +683,7 @@ impl OTLPExporterBaseArgs {
         .with_tls_skip_verify(self.tls_skip_verify)
         .with_headers(custom_headers.as_slice())
         .with_request_timeout(self.request_timeout.into())
-        .with_compression_encoding(self.compression.into())
+        .with_compression_encoding(self.compression)
         .with_pool_idle_timeout(self.pool_idle_timeout)
         .with_pool_max_idle_per_host(self.pool_max_idle_per_host);
 
@@ -705,5 +705,56 @@ impl OTLPExporterBaseArgs {
         }
 
         Ok(builder)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn exporter_config(compression: CompressionEncoding) -> OTLPExporterConfig {
+        let args = OTLPExporterBaseArgs {
+            compression,
+            ..Default::default()
+        };
+        args.try_into_exporter_config(
+            "traces",
+            Endpoint::Base("http://localhost:4317".to_string()),
+            &GlobalExporterRetryArgs::default(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn compression_none_disables_compression() {
+        assert_eq!(
+            exporter_config(CompressionEncoding::None).compression,
+            CompressionEncoding::None
+        );
+        assert_eq!(
+            exporter_config(CompressionEncoding::Gzip).compression,
+            CompressionEncoding::Gzip
+        );
+    }
+
+    #[test]
+    fn per_signal_compression_overrides_base() {
+        let args = OTLPExporterArgs {
+            otlp_exporter_traces_compression: Some(CompressionEncoding::None),
+            ..Default::default()
+        };
+        assert_eq!(
+            build_traces_config(args.clone()).compression,
+            CompressionEncoding::None
+        );
+        // Unset per-signal overrides inherit the base setting
+        assert_eq!(
+            build_metrics_config(args.clone()).compression,
+            CompressionEncoding::Gzip
+        );
+        assert_eq!(
+            build_logs_config(args).compression,
+            CompressionEncoding::Gzip
+        );
     }
 }

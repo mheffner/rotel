@@ -49,7 +49,7 @@ use std::time::Duration;
 const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Supported compression encodings for OTLP data
-#[derive(Clone, Debug, Deserialize, ValueEnum)]
+#[derive(Clone, Debug, PartialEq, Deserialize, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum CompressionEncoding {
     Gzip,
