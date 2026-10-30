@@ -47,32 +47,34 @@ impl Transformer {
         }
     }
 
-    fn build_map_attrs_kv(&self, attrs: &[KeyValue]) -> Vec<(String, String)> {
-        let mut result = Vec::new();
-        self.flatten_keyvalues_map(attrs, String::new(), &mut result);
+    fn build_map_attrs_kv<'a>(&self, attrs: &'a [KeyValue]) -> Vec<(Cow<'a, str>, Cow<'a, str>)> {
+        let mut result = Vec::with_capacity(attrs.len());
+        self.flatten_keyvalues_map(attrs, "", &mut result);
         result
     }
 
-    fn flatten_keyvalues_map(
+    // Keys and string values are borrowed from the attributes; only nested keys and non-string
+    // values are allocated.
+    fn flatten_keyvalues_map<'a>(
         &self,
-        attrs: &[KeyValue],
-        prefix: String,
-        result: &mut Vec<(String, String)>,
+        attrs: &'a [KeyValue],
+        prefix: &str,
+        result: &mut Vec<(Cow<'a, str>, Cow<'a, str>)>,
     ) {
         use opentelemetry_proto::tonic::common::v1::any_value::Value;
 
         for kv in attrs {
             let full_key = if prefix.is_empty() {
-                kv.key.clone()
+                Cow::Borrowed(kv.key.as_str())
             } else {
-                format!("{}.{}", prefix, kv.key)
+                Cow::Owned(format!("{}.{}", prefix, kv.key))
             };
 
             if let Some(any_value) = &kv.value {
                 match &any_value.value {
                     Some(Value::KvlistValue(kvlist)) => {
                         // Recursively flatten nested key-value lists
-                        self.flatten_keyvalues_map(&kvlist.values, full_key, result);
+                        self.flatten_keyvalues_map(&kvlist.values, &full_key, result);
                     }
                     Some(val) => {
                         result.push((full_key, Self::anyvalue_to_string(val)));
@@ -105,7 +107,12 @@ impl Transformer {
     pub(crate) fn transform_attrs_kv_owned(&self, attrs: &[KeyValue]) -> MapOrJson<'static> {
         match self.use_json {
             true => MapOrJson::JsonOwned(self.build_json_attrs_kv_owned(attrs)),
-            false => MapOrJson::Map(self.build_map_attrs_kv(attrs)),
+            false => MapOrJson::Map(
+                self.build_map_attrs_kv(attrs)
+                    .into_iter()
+                    .map(|(k, v)| (Cow::Owned(k.into_owned()), Cow::Owned(v.into_owned())))
+                    .collect(),
+            ),
         }
     }
 
@@ -130,19 +137,19 @@ impl Transformer {
 
     fn anyvalue_to_string(
         val: &opentelemetry_proto::tonic::common::v1::any_value::Value,
-    ) -> String {
+    ) -> Cow<'_, str> {
         use opentelemetry_proto::tonic::common::v1::any_value::Value;
         use serde_json::json;
 
         match val {
-            Value::StringValue(s) => s.clone(),
-            Value::BoolValue(b) => b.to_string(),
-            Value::IntValue(i) => i.to_string(),
-            Value::DoubleValue(d) => json!(d).to_string(),
-            Value::ArrayValue(a) => json!(a).to_string(),
-            Value::KvlistValue(kv) => json!(kv).to_string(),
-            Value::BytesValue(b) => hex::encode(b),
-            Value::StringValueStrindex(_) => String::new(),
+            Value::StringValue(s) => Cow::Borrowed(s.as_str()),
+            Value::BoolValue(b) => Cow::Borrowed(if *b { "true" } else { "false" }),
+            Value::IntValue(i) => Cow::Owned(i.to_string()),
+            Value::DoubleValue(d) => Cow::Owned(json!(d).to_string()),
+            Value::ArrayValue(a) => Cow::Owned(json!(a).to_string()),
+            Value::KvlistValue(kv) => Cow::Owned(json!(kv).to_string()),
+            Value::BytesValue(b) => Cow::Owned(hex::encode(b)),
+            Value::StringValueStrindex(_) => Cow::Borrowed(""),
         }
     }
 }
@@ -263,8 +270,8 @@ mod tests {
         match result {
             MapOrJson::Map(vec) => {
                 assert_eq!(vec.len(), 2);
-                assert!(vec.contains(&("key1".to_string(), "value1".to_string())));
-                assert!(vec.contains(&("key2".to_string(), "42".to_string())));
+                assert!(vec.contains(&("key1".into(), "value1".into())));
+                assert!(vec.contains(&("key2".into(), "42".into())));
             }
             _ => panic!("Expected Map variant"),
         }
@@ -412,8 +419,8 @@ mod tests {
         match result {
             MapOrJson::Map(vec) => {
                 assert_eq!(vec.len(), 2);
-                assert!(vec.contains(&("key1".to_string(), "value1".to_string())));
-                assert!(vec.contains(&("key2".to_string(), "42".to_string())));
+                assert!(vec.contains(&("key1".into(), "value1".into())));
+                assert!(vec.contains(&("key2".into(), "42".into())));
             }
             _ => panic!("Expected Map variant"),
         }
@@ -760,9 +767,9 @@ mod tests {
         match result {
             MapOrJson::Map(vec) => {
                 assert_eq!(vec.len(), 3);
-                assert!(vec.contains(&("simple".to_string(), "value".to_string())));
-                assert!(vec.contains(&("metadata.region".to_string(), "us-east-1".to_string())));
-                assert!(vec.contains(&("metadata.zone".to_string(), "1".to_string())));
+                assert!(vec.contains(&("simple".into(), "value".into())));
+                assert!(vec.contains(&("metadata.region".into(), "us-east-1".into())));
+                assert!(vec.contains(&("metadata.zone".into(), "1".into())));
             }
             _ => panic!("Expected Map variant"),
         }
@@ -807,7 +814,7 @@ mod tests {
         match result {
             MapOrJson::Map(vec) => {
                 assert_eq!(vec.len(), 1);
-                assert!(vec.contains(&("outer.middle.inner".to_string(), "deep".to_string())));
+                assert!(vec.contains(&("outer.middle.inner".into(), "deep".into())));
             }
             _ => panic!("Expected Map variant"),
         }
